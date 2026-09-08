@@ -62,11 +62,20 @@ live chain state instead:
 node scripts/verify-rate.mjs
 ```
 
-> **Do not integrate via `data-core-v2/v3 get-stx-per-ststx`.** Post-PoX-5 it takes a
-> `<reserve-trait>` whose `get-total-stx` returns `(response uint uint)`, while the live
-> `stx-reserve-v2` returns a plain `uint` — the call no longer type-checks. The old
-> `reserve-v1` is drained (701,055 STX, `get-stx-stacking` = `u0`) and reports a ratio of
-> ~0.0148 instead of the true ~1.757. The adapter computes the ratio directly instead.
+**Two integration traps, both live as of 8 Sep 2026:**
+
+> **1. The reserve backs two tokens.** `stx-reserve-v2` backs stSTX *and* stSTXbtc, so the
+> ratio is `(total-stx − ststxbtc-supply − ststxbtc-supply-v2) × 1e6 / ststx-supply`, per
+> StackingDAO's own `data-core-v3`. Skipping the subtraction reads **u1720578** against a
+> true **u1169705** — a ~47% overstatement that would mint far too many principal units
+> per deposit and leave the vault unable to redeem every PT. `verify-rate.mjs` fails if the
+> computed ratio matches the naive figure while stSTXbtc supply is non-zero.
+
+> **2. Do not call `data-core-v2/v3 get-stx-per-ststx`.** It takes a `<reserve-trait>` whose
+> `get-total-stx` returns `(response uint uint)`, while the live `stx-reserve-v2` returns a
+> plain `uint`, so the call no longer type-checks. The old `reserve-v1` is drained
+> (701,055 STX, `get-stx-stacking` = `u0`) and reports ~0.0148. The adapter reimplements
+> the v3 formula against the live contracts instead.
 
 ## Develop
 

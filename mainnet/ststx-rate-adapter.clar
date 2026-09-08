@@ -1,19 +1,27 @@
 ;; ststx-rate-adapter
 ;; Mainnet rate source: STX per stSTX, scaled by u1000000 (6 decimals).
 ;;
-;; The ratio is computed directly from StackingDAO's live reserve and the
-;; stSTX supply rather than routed through data-core get-stx-per-ststx.
-;; Two reasons, both verified against mainnet on 2026-09-05:
+;; Mirrors StackingDAO's own data-core-v3 formula:
 ;;
-;;   1. reserve-v1 is drained legacy state -- 701,055 STX, get-stx-stacking
-;;      u0, entire balance earmarked for withdrawals. Reading it yields a
-;;      ratio of ~u14851 (0.0148) instead of ~u1757195 (1.757).
-;;   2. data-core-v2/v3 get-stx-per-ststx takes a <reserve-trait> whose
-;;      get-total-stx returns (response uint uint). The live stx-reserve-v2
-;;      returns a plain uint, so that call no longer type-checks.
+;;   stx-for-ststx = reserve.get-total-stx
+;;                   - ststxbtc-token.get-total-supply
+;;                   - ststxbtc-token-v2.get-total-supply
+;;   ratio         = stx-for-ststx * 1e6 / ststx-token.get-total-supply
 ;;
-;; Live figures at time of writing: 82,948,022.8 STX backing
-;; 47,204,768.6 stSTX => ratio u1757195.
+;; The subtraction is essential and easy to miss: stx-reserve-v2 backs BOTH
+;; stSTX and stSTXbtc. Dividing the whole reserve by the stSTX supply alone
+;; overstates the ratio badly -- as of 2026-09-08 that error reads u1720578
+;; against a true u1169702, which would mint ~47% too many principal units
+;; per deposit and leave the vault unable to redeem every PT.
+;;
+;; We compute directly rather than calling data-core because that entry point
+;; takes a <reserve-trait> whose get-total-stx returns (response uint uint),
+;; while the live stx-reserve-v2 returns a plain uint, so the call no longer
+;; type-checks. The older reserve-v1 is drained legacy state (701,055 STX,
+;; get-stx-stacking u0) and must not be used.
+;;
+;; The subtraction underflows and aborts if the reserve ever holds less than
+;; the stSTXbtc supply. Failing loudly is the correct behaviour there.
 
 (impl-trait .rate-source-trait.rate-source-trait)
 
@@ -23,7 +31,10 @@
 (define-public (get-ratio)
   (let (
     (total-stx (contract-call? 'SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.stx-reserve-v2 get-total-stx))
+    (btc-supply (unwrap-panic (contract-call? 'SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststxbtc-token get-total-supply)))
+    (btc-supply-v2 (unwrap-panic (contract-call? 'SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststxbtc-token-v2 get-total-supply)))
     (supply (unwrap-panic (contract-call? 'SP4SZE494VC2YC5JYG7AYFQ44F5Q4PYV7DVMDPBG.ststx-token get-total-supply)))
+    (stx-for-ststx (- total-stx btc-supply btc-supply-v2))
   )
     (asserts! (> supply u0) ERR-NO-SUPPLY)
-    (ok (/ (* total-stx RATIO-SCALE) supply))))
+    (ok (/ (* stx-for-ststx RATIO-SCALE) supply))))
