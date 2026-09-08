@@ -82,13 +82,41 @@ node scripts/verify-rate.mjs
 ```sh
 clarinet check     # analyze all contracts (downloads mainnet requirements)
 npm install
-npm test           # 16 tests: lifecycle math + authorization guards
+npm test           # 20 tests: lifecycle math, authorization guards, hostile contracts
 ```
 
 The lifecycle suite mirrors the contract math in exact BigInt arithmetic:
 splitting, index accrual across ratio changes, fair settlement on YT
 transfers, late-depositor fairness, maturity settlement, PT redemption, and
 full conservation of funds.
+
+## Security posture
+
+The vault takes `<sip-010-token>` and `<rate-source>` as call parameters — the
+same surface the June 2025 ALEX Protocol exploit used, where a fake token
+carrying a malicious `transfer` was accepted by a protocol that took arbitrary
+tokens and then used to drain pooled funds. Both are pinned here to a single
+principal fixed at `initialize`, so a foreign contract is rejected before any of
+its code runs. `tests/cyclesplit-hostile.test.ts` proves this with a real
+attacker contract: it asserts the rejection *and* that the attacker's
+`transfer` was invoked zero times, including when the token is set to report
+success without moving funds.
+
+Structural properties worth stating:
+
+- **No privileged role after setup.** `initialize` and `set-vault` each run once
+  and cannot be repeated. There is no pause, no admin withdrawal, no upgrade
+  path, no flag to flip — so a compromised deployer key cannot touch a live
+  series. The trade-off is deliberate: no admin also means no emergency stop.
+- **No bridge, no pools, no price oracle, no leverage, no liquidations.** The
+  ratio is an accounting figure (reserve ÷ supply), not a market price, so it
+  cannot be moved by trading against it.
+- **Funds only leave against burned tokens.** Every outflow path burns PT/YT or
+  clears an accrual entry before the external transfer.
+
+The contracts are **unaudited**. The largest residual risk is the StackingDAO
+dependency: if their reserve accounting changes, the ratio this protocol reads
+changes with it.
 
 ## Deployment (per maturity series)
 

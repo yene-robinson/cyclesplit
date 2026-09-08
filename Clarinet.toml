@@ -54,3 +54,13 @@ check_checker = { trusted_sender = false, trusted_caller = false, callee_filter 
 path = "contracts/mock-rate-source-2.clar"
 clarity_version = 3
 epoch = "latest"
+
+[contracts.mock-hostile-token]
+path = "contracts/mock-hostile-token.clar"
+clarity_version = 3
+epoch = "latest"
+
+[contracts.mock-hostile-rate-source]
+path = "contracts/mock-hostile-rate-source.clar"
+clarity_version = 3
+epoch = "latest"

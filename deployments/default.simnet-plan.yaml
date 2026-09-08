@@ -93,9 +93,19 @@ plan:
       path: contracts/cyclesplit-vault.clar
       clarity-version: 3
     - transaction-type: emulated-contract-publish
+      contract-name: mock-hostile-rate-source
+      emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+      path: contracts/mock-hostile-rate-source.clar
+      clarity-version: 3
+    - transaction-type: emulated-contract-publish
       contract-name: mock-rate-source
       emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
       path: contracts/mock-rate-source.clar
+      clarity-version: 3
+    - transaction-type: emulated-contract-publish
+      contract-name: mock-hostile-token
+      emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+      path: contracts/mock-hostile-token.clar
       clarity-version: 3
     - transaction-type: emulated-contract-publish
       contract-name: mock-rate-source-2
